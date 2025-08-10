@@ -13,13 +13,26 @@ NASAL_FILE = os.path.join(DATA_DIR, 'nasal_table.json')
 POJ_DIFF_FILE = os.path.join(DATA_DIR, 'tl_to_poj_diff.json')
 PUNCTUATION_FILE = os.path.join(DATA_DIR, 'punctuation.json')
 
+# ── 規則集合（模組層，避免作用域問題） ────────────────────────────────
+# 需要在點字後面補「點字空格」的明眼標點（只對這些補）
+NEED_SPACE_AFTER_PUNCT = {
+    '，', ',', '；', ';', '。', '.', '！', '!', '？', '?',
+    '...', '」', '』', '”', '’', ')', '（', '）', ']', '】', '}'
+}
+# 句末標點（遇到後引號/括號時要抑制補空格）
+SENTENCE_ENDERS = {'。', '.', '！', '!', '？', '?'}
+# 後引號 / 括號（它們本身會補點字空格）
+CLOSERS = {'」', '』', '”', '’', ')', '）', ']', '】', '}'}
+# （若你的文本會用到「【」，視需求自行加入 NEED_SPACE_AFTER_PUNCT / CLOSERS）
+
 # ✅ 全域變數初始化
 def load_json(filepath):
     with open(filepath, 'r', encoding='utf-8') as f:
         return json.load(f)
 
 def reload_data():
-    global consonants, vowels, rushio, nasal, tl_to_poj, poj_to_tl, sorted_poj_keys, punctuation_map, punct_chars
+    global consonants, vowels, rushio, nasal, tl_to_poj, poj_to_tl, sorted_poj_keys
+    global punctuation_map, punct_first_chars, punct_keys_sorted
 
     consonants = load_json(CONSONANTS_FILE)
     vowels = load_json(VOWELS_FILE)
@@ -29,12 +42,20 @@ def reload_data():
     poj_to_tl = {v: k for k, v in tl_to_poj.items()}
     sorted_poj_keys = sorted(poj_to_tl.keys(), key=lambda x: -len(x))
 
-    # 標點
+    # 標點（映射：明眼 -> 點字）
     punctuation_map = load_json(PUNCTUATION_FILE)
-    # 建立可辨識的所有標點字元集合（含全形/半形）
-    punct_chars = set(punctuation_map.keys())
+    # 最長優先鍵清單（支援 multi-char，如 "..."）
+    punct_keys_sorted = sorted(punctuation_map.keys(), key=len, reverse=True)
+    # 首字快篩，加速檢測
+    punct_first_chars = {k[0] for k in punct_keys_sorted}
 
 def tokenize(text):
+    """
+    斷成三類 token：
+      - ("word", <字串>)
+      - ("space", <原樣空白/換行>)
+      - ("punct", <原樣標點字串>)  ← 支援多字元（如 "..."）
+    """
     tokens = []
     buf = []
 
@@ -43,26 +64,33 @@ def tokenize(text):
             tokens.append(("word", "".join(buf)))
             buf.clear()
 
-    i = 0
-    while i < len(text):
+    i, n = 0, len(text)
+    while i < n:
         ch = text[i]
 
         # 空白（保留原樣，避免 split() 把多空白吃掉）
         if ch.isspace():
             flush_word()
             j = i
-            while j < len(text) and text[j].isspace():
+            while j < n and text[j].isspace():
                 j += 1
             tokens.append(("space", text[i:j]))
             i = j
             continue
 
-        # 標點（包含全形/半形；依你的 punctuation.json）
-        if ch in punct_chars:
-            flush_word()
-            tokens.append(("punct", ch))
-            i += 1
-            continue
+        # 標點（最長優先；支援 multi-char，例如 "..."）
+        if ch in punct_first_chars:
+            matched = False
+            for key in punct_keys_sorted:  # 長 -> 短
+                L = len(key)
+                if i + L <= n and text[i:i+L] == key:
+                    flush_word()
+                    tokens.append(("punct", key))
+                    i += L
+                    matched = True
+                    break
+            if matched:
+                continue
 
         # 其他字元視為字詞的一部分（含 a-z、數字、變音、及連字符）
         buf.append(ch)
@@ -77,63 +105,16 @@ reload_data()
 def poj_to_tl_text(text):
     # 🧠 預處理：ⁿ 換成 nn
     text = text.replace("ⁿ", "nn")
-
     # 🔁 使用排序過的 key，確保長的字串先被處理（避免 ua 被 oa 取代）
     for poj in sorted_poj_keys:
         text = text.replace(poj, poj_to_tl[poj])
-
     return text
 
 # 🔹 切音節函式
 def split_syllables(word):
     # 優先使用連字符來斷音節
     return word.split('-')
-    i = 0
-
-    while i < len(word):
-        match = None  # ✅ 初始化匹配變數
-
-        # 先檢查 rushio_syllables 是否獨立匹配
-        for r in sorted(rushio.keys(), key=lambda x: -len(x)):
-            if word[i:].startswith(r):
-                result.append(r)
-                i += len(r)
-                match = r
-                break
-
-        # 再檢查 vowels 是否能獨立匹配
-        for v in sorted(vowels.keys(), key=lambda x: -len(x)):
-            if word[i:].startswith(v):
-                result.append(v)
-                i += len(v)
-                match = v  # ✅ 確保 match 存的是字串，而非布林值
-                break
-
-        # 然後檢查 consonants + vowels / nasal / rushio
-        for c in sorted(consonants.keys(), key=lambda x: -len(x)):
-            if word[i:].startswith(c):
-                for v in sorted(vowels.keys(), key=lambda x: -len(x)):
-                    if word[i + len(c):].startswith(v):
-                        match = c + v
-                        break
-                for r in sorted(rushio.keys(), key=lambda x: -len(x)):
-                    if word[i + len(c):].startswith(r):
-                        match = c + r
-                        break
-                for n in sorted(nasal.keys(), key=lambda x: -len(x)):
-                    if word[i + len(c):].startswith(n):
-                        match = c + n
-                        break
-                if match:
-                    result.append(match)
-                    i += len(match)
-                    break
-
-        if match is None:
-            result.append('[錯誤]')
-            break
-
-    return result
+    # （以下預留原先進階斷音，未啟用）
 
 # 🔹 轉換為點字（包含純母音含聲調處理）
 def convert_syllable(s):
@@ -176,15 +157,32 @@ def convert_text_to_braille(text, input_type="tl"):
     tokens = tokenize(text)
     out = []
 
-    for kind, val in tokens:
+    for idx, (kind, val) in enumerate(tokens):
         if kind == "space":
             out.append(val)
+
         elif kind == "punct":
-            # 沒在表裡就原樣保留（方便漸進擴充）
-            out.append(punctuation_map.get(val, val))
+            # 轉成點字（若表中沒有就原樣保留）
+            braille_punct = punctuation_map.get(val, val)
+
+            # 是否需要在這顆標點後面補「點字空格」
+            add_braille_space = val in NEED_SPACE_AFTER_PUNCT
+
+            # 若是句末標點，且後面緊接著「後引號/括號」，就不要在句末標點後加空格
+            if add_braille_space and val in SENTENCE_ENDERS:
+                # 往後看下一個「非空白」token
+                j = idx + 1
+                while j < len(tokens) and tokens[j][0] == "space":
+                    j += 1
+                if j < len(tokens) and tokens[j][0] == "punct" and tokens[j][1] in CLOSERS:
+                    add_braille_space = False
+
+            out.append(braille_punct)
+            if add_braille_space:
+                out.append('\u2800')  # 點字空格（U+2800）
+
         else:  # "word"
             # 逐詞處理（詞內用 '-' 當音節連字符）
-            # 注意：若你之後要支援「減號」做真正的標點，應在 tokenize 裡把獨立的 '-' 判成 punct
             pieces = val.split('-') if val else []
             if pieces:
                 braille = ''.join(convert_syllable(s) or '[錯誤]' for s in pieces)
@@ -193,4 +191,3 @@ def convert_text_to_braille(text, input_type="tl"):
                 out.append(val)
 
     return ''.join(out)
-
