@@ -11,6 +11,7 @@ VOWELS_FILE = os.path.join(DATA_DIR, 'vowels_all.json')
 RUSHIO_FILE = os.path.join(DATA_DIR, 'rushio_syllables.json')
 NASAL_FILE = os.path.join(DATA_DIR, 'nasal_table.json')
 POJ_DIFF_FILE = os.path.join(DATA_DIR, 'tl_to_poj_diff.json')
+PUNCTUATION_FILE = os.path.join(DATA_DIR, 'punctuation.json')
 
 # ✅ 全域變數初始化
 def load_json(filepath):
@@ -18,8 +19,8 @@ def load_json(filepath):
         return json.load(f)
 
 def reload_data():
-    """手動重新載入 JSON 資料表"""
-    global consonants, vowels, rushio, nasal, tl_to_poj, poj_to_tl, sorted_poj_keys
+    global consonants, vowels, rushio, nasal, tl_to_poj, poj_to_tl, sorted_poj_keys, punctuation_map, punct_chars
+
     consonants = load_json(CONSONANTS_FILE)
     vowels = load_json(VOWELS_FILE)
     rushio = load_json(RUSHIO_FILE)
@@ -27,6 +28,48 @@ def reload_data():
     tl_to_poj = load_json(POJ_DIFF_FILE)
     poj_to_tl = {v: k for k, v in tl_to_poj.items()}
     sorted_poj_keys = sorted(poj_to_tl.keys(), key=lambda x: -len(x))
+
+    # 標點
+    punctuation_map = load_json(PUNCTUATION_FILE)
+    # 建立可辨識的所有標點字元集合（含全形/半形）
+    punct_chars = set(punctuation_map.keys())
+
+def tokenize(text):
+    tokens = []
+    buf = []
+
+    def flush_word():
+        if buf:
+            tokens.append(("word", "".join(buf)))
+            buf.clear()
+
+    i = 0
+    while i < len(text):
+        ch = text[i]
+
+        # 空白（保留原樣，避免 split() 把多空白吃掉）
+        if ch.isspace():
+            flush_word()
+            j = i
+            while j < len(text) and text[j].isspace():
+                j += 1
+            tokens.append(("space", text[i:j]))
+            i = j
+            continue
+
+        # 標點（包含全形/半形；依你的 punctuation.json）
+        if ch in punct_chars:
+            flush_word()
+            tokens.append(("punct", ch))
+            i += 1
+            continue
+
+        # 其他字元視為字詞的一部分（含 a-z、數字、變音、及連字符）
+        buf.append(ch)
+        i += 1
+
+    flush_word()
+    return tokens
 
 # ✅ 啟動時就先載入
 reload_data()
@@ -121,21 +164,33 @@ def convert_syllable(s):
     return '[錯誤]'
 
 def convert_text_to_braille(text, input_type="tl"):
-    text = text.strip()
+    text = text.rstrip("\n")  # 保留內文空白但去掉檔尾多餘換行
 
+    # 先做 POJ→TL（在「明眼字」層處理）
     if input_type == "poj":
         text = text.replace('ⁿ', 'nn')
         for poj in sorted_poj_keys:
             tl = poj_to_tl[poj]
             text = text.replace(poj, tl)
 
-    result_lines = []
-    for line in text.splitlines():
-        result_words = []
-        for word in line.split():
-            syllables = split_syllables(word)
-            braille = ''.join(convert_syllable(s) or '[錯誤]' for s in syllables)
-            result_words.append(braille)
-        result_lines.append(" ".join(result_words))
+    tokens = tokenize(text)
+    out = []
 
-    return "\n".join(result_lines)
+    for kind, val in tokens:
+        if kind == "space":
+            out.append(val)
+        elif kind == "punct":
+            # 沒在表裡就原樣保留（方便漸進擴充）
+            out.append(punctuation_map.get(val, val))
+        else:  # "word"
+            # 逐詞處理（詞內用 '-' 當音節連字符）
+            # 注意：若你之後要支援「減號」做真正的標點，應在 tokenize 裡把獨立的 '-' 判成 punct
+            pieces = val.split('-') if val else []
+            if pieces:
+                braille = ''.join(convert_syllable(s) or '[錯誤]' for s in pieces)
+                out.append(braille)
+            else:
+                out.append(val)
+
+    return ''.join(out)
+
