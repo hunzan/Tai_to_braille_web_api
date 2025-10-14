@@ -1,10 +1,70 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-Hant-TW">
 <head>
-  <meta charset="UTF-8">
-  <title>$Title$</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>隱私權政策｜阿猴 & 金蕉</title>
+<link rel="icon" href="/static/favicon.ico" />
+<style>
+:root{
+  --bg:#0b0d10;
+  --fg:#f2f4f8;
+  --muted:#a6b0bf;
+  --banana:#ffd452;
+  --card:rgba(255,255,255,.08);
+  --border:rgba(255,255,255,.12);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;background:var(--bg);color:var(--fg);line-height:1.7}
+main{max-width:860px;margin:2rem auto;padding:1.5rem}
+h1{color:var(--banana);margin:.2rem 0 1rem;font-size:1.8rem;text-align:center}
+h2{color:var(--banana);margin:1.2rem 0 .6rem;font-size:1.25rem}
+p,li{margin:.5em 0}
+ul{padding-left:1.2em}
+a{color:var(--banana);text-decoration:none}
+a:hover,a:focus{text-decoration:underline;outline:none}
+nav{margin-bottom:1rem;text-align:center}
+nav a{color:var(--fg);border:1px solid var(--border);border-radius:8px;padding:.35rem .75rem;text-decoration:none}
+nav a:hover{background:rgba(255,255,255,.08);color:var(--banana)}
+footer{text-align:center;color:var(--muted);border-top:1px solid var(--border);padding:1rem 0;margin-top:2rem;font-size:.9rem}
+footer a{color:var(--banana);text-decoration:none}
+footer a:hover{text-decoration:underline}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:1rem}
+</style>
 </head>
 <body>
-$END$
+
+<main>
+  <nav><a href="{{ url_for('index', _external=True) }}">回首頁</a></nav>
+  <h1>隱私權政策</h1>
+
+  <div class="card">
+    <h2>1. 我們收集的資訊</h2>
+    <p>本服務不會主動要求個資。若使用第三方服務（如 Google AdSense、Analytics），其可能自動蒐集匿名使用資料，例如瀏覽行為、裝置資訊與 Cookie。</p>
+
+    <h2>2. 資料用途</h2>
+    <p>蒐集的資料僅用於改善服務體驗、統計分析與顯示個人化內容，不會用於辨識個人身分。</p>
+
+    <h2>3. 第三方服務</h2>
+    <p>若本服務嵌入或連結第三方服務（例如 Google 產品），資料將依該服務之隱私政策處理。請參考：</p>
+    <ul>
+      <li><a href="https://policies.google.com/privacy?hl=zh-TW" target="_blank">Google 隱私權政策</a></li>
+    </ul>
+
+    <h2>4. Cookie 使用</h2>
+    <p>Cookie 主要用於分析與記錄偏好設定。您可於瀏覽器設定中清除或停用 Cookie，但部分功能可能因此受限。</p>
+
+    <h2>5. 政策修改</h2>
+    <p>我們可能不定期更新本政策並公告於此頁。持續使用本服務即視為同意更新後內容。</p>
+
+    <h2>6. 聯絡我們</h2>
+    <p>如有疑問或請求刪除資料，請寄信至：<a href="mailto:akau.kimchio@gmail.com">akau.kimchio@gmail.com</a></p>
+  </div>
+
+  <footer>
+    © 2025 阿猴（Lîm A-kâu） & 金蕉（Kim Chio）｜<a href="/terms">使用條款</a>
+  </footer>
+</main>
+
 </body>
 </html>

@@ -42,6 +42,14 @@ def favicon():
 def support_us():
     return render_template('support_us.html')
 
+@app.route("/privacy")
+def privacy():
+    return render_template("privacy.html")
+
+@app.route("/terms")
+def terms():
+    return render_template("terms.html")
+
 # 🔹 啟動 Flask 伺服器（開發用）
 if __name__ == '__main__':
     app.run(debug=True, threaded=True)
